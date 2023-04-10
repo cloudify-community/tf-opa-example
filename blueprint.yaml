@@ -1,0 +1,51 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+description: OPA Terraform Demo Blueprint
+
+imports:
+  - http://cloudify.co/spec/cloudify/6.3.0/types.yaml
+  - plugin:cloudify-terraform-plugin
+
+inputs:
+  ssh_ips:
+    description: List of IP addresses for SSH access
+    display_label: SSH IP Addresses
+
+node_templates:
+
+  terraform:
+    type: cloudify.nodes.terraform
+
+  ec2-instance:
+    type: cloudify.nodes.terraform.Module
+    properties:
+      opa_config:
+        policy_bundles:
+          - name: opa_bundle
+            location: resources/policy.zip
+      resource_config:
+        source:
+          location: resources/instance.zip
+        variables:
+          access_key: { get_secret: aws_access_key_id }
+          secret_key: { get_secret: aws_secret_access_key }
+          ssh_ips: { get_input: ssh_ips }
+    relationships:
+      - target: terraform
+        type: cloudify.terraform.relationships.run_on_host
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        configure:
+          implementation: tf.cloudify_tf.tasks.evaluate_opa_policy
+          inputs:
+            decision: terraform/deny
+            opa_config: { get_property: [SELF, opa_config ] }
+        start:
+          implementation: tf.cloudify_tf.tasks.apply
+        poststart:
+          implementation: tf.cloudify_tf.tasks.state_pull
+
+capabilities:
+  endpoint:
+    description: Endpoint IP address for EC2 instance
+    value: { get_attribute: [ ec2-instance, outputs, instance_ip, value ] }

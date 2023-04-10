@@ -1,0 +1,1 @@
+The blueprint in this repository demonstrates an OPA policy evaluation against a Terraform plan using Cloudify's Terraform plugin.
